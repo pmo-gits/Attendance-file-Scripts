@@ -36,7 +36,7 @@ function getSalaryAdvanceEMI_Button() {
   }
 
   // 1) Must be Attendance LOCKED
-  if (!isAttendanceLocked_(ss)) {
+  if (!isAttendanceLockedForSalaryAdvance_(ss)) {
     ui.alert("Stop", "Attendance entry is not LOCKED. Please lock the file first.", ui.ButtonSet.OK);
     return;
   }
@@ -107,7 +107,7 @@ function refreshSalaryAdvanceEMI_Button() {
   }
 
   // 1) Must be Attendance LOCKED
-  if (!isAttendanceLocked_(ss)) {
+  if (!isAttendanceLockedForSalaryAdvance_(ss)) {
     ui.alert("Stop", "Attendance entry is not LOCKED. Please lock the file first.", ui.ButtonSet.OK);
     return;
   }
@@ -172,7 +172,7 @@ function refreshSalaryAdvanceEMI_Button() {
  * Helpers (inside this file only)
  * ========================================================= */
 
-function isAttendanceLocked_(ss) {
+function isAttendanceLockedForSalaryAdvance_(ss) {
   const sh = ss.getSheetByName(ATTENDANCE_SHEET_NAME);
   if (!sh) throw new Error(`Sheet not found: ${ATTENDANCE_SHEET_NAME}`);
 
