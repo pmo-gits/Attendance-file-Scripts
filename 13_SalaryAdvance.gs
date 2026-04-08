@@ -54,6 +54,12 @@ function getSalaryAdvanceEMI_Button() {
     return;
   }
 
+  // 2) Payroll lock stop (based on deductions sheet "Payroll Status")
+  if (isPayrollLockedInDeductions_(deductions)) {
+    ui.alert("Stop", "Payroll is LOCKED (Payroll Status is filled). Get EMI is not allowed.", ui.ButtonSet.OK);
+    return;
+  }
+
   // 2) Open Master
   const master = SpreadsheetApp.openById(SALARY_ADVANCE_MASTER_SPREADSHEET_ID);
 
