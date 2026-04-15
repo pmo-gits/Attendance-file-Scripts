@@ -92,12 +92,12 @@ function getSalaryAdvanceEMI_Button() {
     rows7 = rowsFromSchedule7;
   }
 
-  // 5) Write to Salary Advance deductions (do NOT touch Payroll Status)
-  // Writes: Month..Current Balance + HR Decision blank + Planned EMI blank
-  const out9 = rows7.map(r7 => [...r7, "", ""]); // add HR Decision + Planned EMI
-  writeToDeductions_(deductions, out9, /*clearBefore*/ false);
+  // 5) Write to Salary Advance deductions (do NOT touch Payroll Status / Planned EMI)
+  // Writes: Month..Current Balance + HR Decision blank
+  const out8 = rows7.map(r7 => [...r7, ""]); // add HR Decision blank
+  writeToDeductions_(deductions, out8, /*clearBefore*/ false);
 
-  ui.alert("Done", `Loaded ${out9.length} EMI rows for ${monthKey}.`, ui.ButtonSet.OK);
+  ui.alert("Done", `Loaded ${out8.length} EMI rows for ${monthKey}.`, ui.ButtonSet.OK);
 }
 
 /** ✅ REFRESH Salary Advance EMI */
