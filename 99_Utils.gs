@@ -258,6 +258,12 @@ function clearMonthlySheets_(attendanceSheet, empCount, year, monthIndex0, daysI
   if (od) {
     clearOtherDeductionsInputsByHeader_(od, 2, od.getMaxRows());
   }
+
+  // 9) Salary Advance deductions: Clear selected inputs only by HEADER NAME (rows 2..maxRows)
+  const sad = ss.getSheetByName(SALARY_ADVANCE_DEDUCTIONS_SHEET_NAME);
+  if (sad) {
+    clearSalaryAdvanceDeductionsInputsByHeader_(sad, 2, sad.getMaxRows());
+  }
 }
 
 /**
@@ -389,6 +395,53 @@ function clearOtherDeductionsInputsByHeader_(sh, startRow, endRow) {
     "AMOUNT",
     "MONTH APPLICABLE [MM/DD/YY]",
     "REMARKS"
+  ];
+
+  const numRows = Math.max(endRow - startRow + 1, 0);
+  if (numRows <= 0) return;
+
+  targets.forEach(t => {
+    const idx = headers.indexOf(t);
+    if (idx === -1) return; // safe skip
+    sh.getRange(startRow, idx + 1, numRows, 1).clearContent();
+  });
+}
+
+/**
+ * ✅ Salary Advance deductions: Clear selected input columns by HEADER NAME
+ * Clears values only for rows startRow..endRow
+ * Targets (as confirmed):
+ * - MONTH
+ * - EMPLOYEE CODE
+ * - NAME
+ * - DEPARTMENT
+ * - EMI REFERENCE NUMBER
+ * - EMI AMOUNT
+ * - CURRENT BALANCE
+ * - HR DECISION
+ * - PAYROLL STATUS
+ * - RECOVERED AMOUNT
+ *
+ * Keeps any non-target columns intact.
+ */
+function clearSalaryAdvanceDeductionsInputsByHeader_(sh, startRow, endRow) {
+  const lastCol = sh.getLastColumn();
+  if (lastCol < 1) return;
+
+  const headers = sh.getRange(1, 1, 1, lastCol).getDisplayValues()[0]
+    .map(h => String(h || '').trim().toUpperCase());
+
+  const targets = [
+    'MONTH',
+    'EMPLOYEE CODE',
+    'NAME',
+    'DEPARTMENT',
+    'EMI REFERENCE NUMBER',
+    'EMI AMOUNT',
+    'CURRENT BALANCE',
+    'HR DECISION',
+    'PAYROLL STATUS',
+    'RECOVERED AMOUNT'
   ];
 
   const numRows = Math.max(endRow - startRow + 1, 0);
