@@ -8,6 +8,9 @@
  *    - If snapshot not present: fetch from Master "EMI_SCHEDULE" where Status = ACTIVE
  *      then append snapshot into Master "Shared EMI Summary"
  *    - Writes into Attendance "Salary Advance deductions"
+ *    - Clears ONLY these columns before paste:
+ *      Month, Employee Code, Name, Department, EMI Reference Number, EMI Amount, Current Balance, HR Decision
+ *      (Does NOT clear Planned EMI, Payroll Status)
  *
  * 2) Refresh Salary Advance EMI -> refreshSalaryAdvanceEMI_Button()
  *    - Requires Attendance LOCKED
@@ -92,10 +95,11 @@ function getSalaryAdvanceEMI_Button() {
     rows7 = rowsFromSchedule7;
   }
 
-  // 5) Write to Salary Advance deductions (do NOT touch Payroll Status / Planned EMI)
-  // Writes: Month..Current Balance + HR Decision blank
+  // 5) Write to Salary Advance deductions
+  // Clears ONLY: Month..Current Balance + HR Decision
+  // Does NOT clear Planned EMI / Payroll Status
   const out8 = rows7.map(r7 => [...r7, ""]); // add HR Decision blank
-  writeToDeductions_(deductions, out8, /*clearBefore*/ false);
+  writeToDeductions_(deductions, out8, /*clearBefore*/ true);
 
   ui.alert("Done", `Loaded ${out8.length} EMI rows for ${monthKey}.`, ui.ButtonSet.OK);
 }
