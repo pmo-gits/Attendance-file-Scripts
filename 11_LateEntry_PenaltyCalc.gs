@@ -122,9 +122,9 @@ function recalcLateEntryLeavePenaltyCount() {
     outPenalty[r] = [penalty];
 
     function applyLate_(minutes) {
-      if (minutes < 5) return;
+      if (minutes <= 5) return;  // ✅ CHANGED: was (minutes < 5), now <= 5
 
-      // 5–10 min: grace only
+      // 6–10 min: grace only  // ✅ CHANGED: was 5–10 min, now 6–10 min
       if (minutes <= 10) {
         if (graceUsed < 3) {
           graceUsed += 1;
