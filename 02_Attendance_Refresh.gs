@@ -109,5 +109,44 @@ function refreshAttendanceMonth_WithParsed_(year, monthIndex0) {
   // ✅ Carry Forwarded refresh (NEW behavior: clear specific headers only; no empRows)
   refreshCarryForwardedSheet_();
 
+  // Ensure mandatory installable triggers exist
+  ensureMandatoryAttendanceTriggers_();
+
   ui.alert(`Attendance refreshed for ${monthName_(monthIndex0)} ${year}.\nActive employees loaded: ${empRows.length}`);
+}
+
+/**
+ * Ensure mandatory installable attendance triggers exist.
+ * Safe to re-run. It will not create duplicates.
+ */
+function ensureMandatoryAttendanceTriggers_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const requiredTriggers = [
+    'onEditLeaveLedgerAuto',
+    'onEdit_RecoveredLedgerAuto_'
+  ];
+
+  const existing = ScriptApp.getProjectTriggers();
+
+  const existingHandlers = existing
+    .filter(t => {
+      try {
+        return t.getTriggerSourceId() === ss.getId();
+      } catch (e) {
+        return false;
+      }
+    })
+    .map(t => t.getHandlerFunction());
+
+  requiredTriggers.forEach(fn => {
+    if (existingHandlers.indexOf(fn) !== -1) {
+      return;
+    }
+
+    ScriptApp.newTrigger(fn)
+      .forSpreadsheet(ss)
+      .onEdit()
+      .create();
+  });
 }
