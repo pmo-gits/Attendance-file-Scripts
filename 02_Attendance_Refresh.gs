@@ -117,7 +117,7 @@ function refreshAttendanceMonth_WithParsed_(year, monthIndex0) {
 
 /**
  * Ensure mandatory installable attendance triggers exist.
- * Safe to re-run. It will not create duplicates.
+ * Safe to re-run. It deletes old same-handler triggers and recreates them.
  */
 function ensureMandatoryAttendanceTriggers_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -127,24 +127,18 @@ function ensureMandatoryAttendanceTriggers_() {
     'onEdit_RecoveredLedgerAuto_'
   ];
 
-  const existing = ScriptApp.getProjectTriggers();
+  const triggers = ScriptApp.getProjectTriggers();
 
-  const existingHandlers = existing
-    .filter(t => {
-      try {
-        return t.getTriggerSourceId() === ss.getId();
-      } catch (e) {
-        return false;
-      }
-    })
-    .map(t => t.getHandlerFunction());
+  triggers.forEach(trigger => {
+    const handler = trigger.getHandlerFunction();
 
-  requiredTriggers.forEach(fn => {
-    if (existingHandlers.indexOf(fn) !== -1) {
-      return;
+    if (requiredTriggers.indexOf(handler) !== -1) {
+      ScriptApp.deleteTrigger(trigger);
     }
+  });
 
-    ScriptApp.newTrigger(fn)
+  requiredTriggers.forEach(handler => {
+    ScriptApp.newTrigger(handler)
       .forSpreadsheet(ss)
       .onEdit()
       .create();
