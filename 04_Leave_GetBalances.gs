@@ -5,10 +5,24 @@
 function getLeaveBalances_Button() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const attendanceFileName = ss.getName().trim();
+  const user = Session.getEffectiveUser().getEmail();
+  const PMO = "pmo@butlerleather.com";
+  const ALLOWED = "hrassist@butlerleather.com";
+
+  // User gate
+  if (user !== PMO && user !== ALLOWED) {
+    ui.alert("Access Denied", "You are not authorised to run this action.", ui.ButtonSet.OK);
+    return;
+  }
 
   if (isAttendanceLocked_()) {
     ui.alert("This attendance file is LOCKED.\nNo changes allowed.");
+    return;
+  }
+
+  const idsInAttendance = getAttendanceEmployeeIds_();
+  if (idsInAttendance.size === 0) {
+    ui.alert("No employee IDs found in Attendance entry sheet.");
     return;
   }
 
@@ -22,23 +36,38 @@ function getLeaveBalances_Button() {
     return;
   }
 
-  const idsInAttendance = getAttendanceEmployeeIds_();
-  if (idsInAttendance.size === 0) {
-    ui.alert("No employee IDs found in Attendance entry sheet.");
-    return;
+  // Dispatch
+  if (user === PMO) {
+    const attendanceFileName = ss.getName().trim();
+    const rows = computeLeaveBalancesRows_(attendanceFileName);
+    if (rows.length === 0) {
+      ui.alert("No leave balances found.");
+      return;
+    }
+    writeLeaveBalancesToAttendance_(rows);
+    setAttendanceLocked_();
+    protectLeaveBalancesTab_();
+    ui.alert(`LOCKED ✅\nLeave balances updated successfully.\n\nRows: ${rows.length}`);
+  } else {
+    // hrassist → Web App
+    try {
+      const payload = { action: "getLeaveBalances" };
+      const response = UrlFetchApp.fetch(ATTENDANCE_WEBAPP_URL, {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      const result = JSON.parse(response.getContentText());
+      if (result.status === "success") {
+        ui.alert(result.message || "Leave balances updated successfully.");
+      } else {
+        ui.alert("Error: " + (result.message || "Unknown error from Web App."));
+      }
+    } catch (e) {
+      ui.alert("Web App call failed: " + e.message);
+    }
   }
-
-  const rows = computeLeaveBalancesRows_(attendanceFileName);
-  if (rows.length === 0) {
-    ui.alert("No leave balances found.");
-    return;
-  }
-
-  writeLeaveBalancesToAttendance_(rows);
-
-  setAttendanceLocked_();
-
-  ui.alert(`LOCKED ✅\nLeave balances updated successfully.\n\nRows: ${rows.length}`);
 }
 
 function computeLeaveBalancesRows_(attendanceFileName) {
@@ -81,3 +110,19 @@ function writeLeaveBalancesToAttendance_(rows) {
   sh.getRange(2, 1, rows.length, 7).setValues(rows);
 }
 
+function protectLeaveBalancesTab_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(LEAVE_BALANCES_SHEET_NAME);
+  if (!sh) throw new Error(`Sheet "${LEAVE_BALANCES_SHEET_NAME}" not found.`);
+
+  // Remove any existing protections on this sheet
+  const existing = sh.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  existing.forEach(p => p.remove());
+
+  // Apply new protection — pmo only
+  const protection = sh.protect();
+  protection.setDescription("Leave Balances — locked after Get Leave Balances");
+  protection.removeEditors(protection.getEditors());
+  protection.addEditor("pmo@butlerleather.com");
+  if (protection.canDomainEdit()) protection.setDomainEdit(false);
+}
