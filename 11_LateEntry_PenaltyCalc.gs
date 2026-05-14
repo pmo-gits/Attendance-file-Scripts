@@ -8,8 +8,17 @@
 function recalcLateEntryLeavePenaltyCount() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const user = Session.getEffectiveUser().getEmail();
+  const PMO = "pmo@butlerleather.com";
+  const ALLOWED = "hrassist@butlerleather.com";
 
-  // ✅ NEW: Allow run only from Late Entry sheet
+  // User gate
+  if (user !== PMO && user !== ALLOWED) {
+    ui.alert("Access Denied", "You are not authorised to run this action.", ui.ButtonSet.OK);
+    return;
+  }
+
+  // ✅ Allow run only from Late Entry sheet
   const activeSheet = ss.getActiveSheet();
   if (!activeSheet || activeSheet.getName() !== "Late Entry") {
     ui.alert('Please run this function from the "Late Entry" sheet only.');
@@ -71,6 +80,36 @@ function recalcLateEntryLeavePenaltyCount() {
     return;
   }
 
+  // Dispatch
+  if (user === PMO) {
+    recalcLateEntryPenalty_Runner_(sh, iPenalty, iEmpCode, iCategory, dateStartCol1, dateEndCol1, lastEmpIndex0, lastCol);
+    ui.alert(`Late penalty calculated ✅\nEmployees processed: ${lastEmpIndex0 + 1}`);
+  } else {
+    // hrassist → Web App
+    try {
+      const payload = { action: "recalcLateEntryPenalty" };
+      const response = UrlFetchApp.fetch(ATTENDANCE_WEBAPP_URL, {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      const result = JSON.parse(response.getContentText());
+      if (result.status === "success") {
+        ui.alert(result.message || "Late penalty calculated successfully.");
+      } else {
+        ui.alert("Error: " + (result.message || "Unknown error from Web App."));
+      }
+    } catch (e) {
+      ui.alert("Web App call failed: " + e.message);
+    }
+  }
+}
+
+/**
+ * Late Entry Penalty (Internal Runner)
+ */
+function recalcLateEntryPenalty_Runner_(sh, iPenalty, iEmpCode, iCategory, dateStartCol1, dateEndCol1, lastEmpIndex0, lastCol) {
   const rowsToProcess = lastEmpIndex0 + 1;
   const data = sh.getRange(2, 1, rowsToProcess, lastCol).getValues();
   const outPenalty = new Array(rowsToProcess).fill(0).map(() => [""]);
@@ -96,48 +135,49 @@ function recalcLateEntryLeavePenaltyCount() {
       if (t === "WO") continue;
 
       if (t === "P60") {
-        if (permSlots >= 1) {
-          permSlots -= 1;
-          continue;
-        }
-        applyLate_(60);
-        continue;
+        if (permSlots >= 1) { permSlots -= 1; continue; }
+        applyLate_(60); continue;
       }
 
       if (t === "P120") {
-        if (isStaff && permSlots >= 2) {
-          permSlots -= 2;
-          continue;
-        }
-        applyLate_(120);
-        continue;
+        if (isStaff && permSlots >= 2) { permSlots -= 2; continue; }
+        applyLate_(120); continue;
       }
 
       const num = parseFloat(String(v).replace(/,/g, "").trim());
       if (!isFinite(num)) continue;
-
       applyLate_(num);
     }
 
     outPenalty[r] = [penalty];
 
     function applyLate_(minutes) {
-      if (minutes <= 5) return;  // ✅ CHANGED: was (minutes < 5), now <= 5
-
-      // 6–10 min: grace only  // ✅ CHANGED: was 5–10 min, now 6–10 min
+      if (minutes <= 5) return;
       if (minutes <= 10) {
-        if (graceUsed < 3) {
-          graceUsed += 1;
-          return;
-        }
-        // grace exhausted → penalty applies
+        if (graceUsed < 3) { graceUsed += 1; return; }
       }
-
-      // >10 min OR grace exhausted
       penalty += (minutes > 270) ? 1 : 0.5;
     }
   }
 
   sh.getRange(2, iPenalty + 1, outPenalty.length, 1).setValues(outPenalty);
-  ui.alert(`Late penalty calculated ✅\nEmployees processed: ${outPenalty.length}`);
+  protectLateEntryPenaltyColumn_(sh, iPenalty + 1);
+}
+
+function protectLateEntryPenaltyColumn_(sh, penaltyCol1) {
+  // Remove existing range protections on this column
+  const existing = sh.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+  existing.forEach(p => {
+    const r = p.getRange();
+    if (r.getColumn() === penaltyCol1) p.remove();
+  });
+
+  // Protect LATE PENALTY COUNT column — pmo only
+  const lastRow = sh.getLastRow();
+  const protectRange = sh.getRange(1, penaltyCol1, lastRow, 1);
+  const protection = protectRange.protect();
+  protection.setDescription("Late Entry — LATE PENALTY COUNT locked after recalc");
+  protection.removeEditors(protection.getEditors());
+  protection.addEditor("pmo@butlerleather.com");
+  if (protection.canDomainEdit()) protection.setDomainEdit(false);
 }
