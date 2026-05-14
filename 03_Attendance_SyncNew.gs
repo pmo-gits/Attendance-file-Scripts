@@ -3,6 +3,16 @@
  ************************************************/
 function syncNewEmployeesAppendOnly() {
   const ui = SpreadsheetApp.getUi();
+  const user = Session.getEffectiveUser().getEmail();
+  const PMO = "pmo@butlerleather.com";
+  const ALLOWED = "hrassist@butlerleather.com";
+
+  // User gate
+  if (user !== PMO && user !== ALLOWED) {
+    ui.alert("Access Denied", "You are not authorised to run this action.", ui.ButtonSet.OK);
+    return;
+  }
+
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ATTENDANCE_SHEET_NAME);
   if (!sheet) {
     ui.alert(`Sheet "${ATTENDANCE_SHEET_NAME}" not found. Please update ATTENDANCE_SHEET_NAME in script.`);
@@ -55,6 +65,37 @@ function syncNewEmployeesAppendOnly() {
     return;
   }
 
+  // Dispatch
+  if (user === PMO) {
+    syncNewEmployeesAppendOnly_Runner_(sheet, newRows, year, monthIndex0, daysInMonth);
+  } else {
+    // hrassist → Web App
+    try {
+      const payload = { action: "syncNewEmployees" };
+      const response = UrlFetchApp.fetch(ATTENDANCE_WEBAPP_URL, {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      const result = JSON.parse(response.getContentText());
+      if (result.status === "success") {
+        ui.alert(result.message || "New employees synced successfully.");
+      } else {
+        ui.alert("Error: " + (result.message || "Unknown error from Web App."));
+      }
+    } catch (e) {
+      ui.alert("Web App call failed: " + e.message);
+    }
+  }
+}
+
+/**
+ * Sync New Employees (Internal Runner)
+ */
+function syncNewEmployeesAppendOnly_Runner_(sheet, newRows, year, monthIndex0, daysInMonth) {
+  const ui = SpreadsheetApp.getUi();
+  const lastRow = sheet.getLastRow();
   const appendStartRow = lastRow + 1;
 
   // Ensure enough rows
@@ -78,6 +119,6 @@ function syncNewEmployeesAppendOnly() {
 
   // ✅ Append same employees into Late Entry
   appendNewEmployeesToLateEntry_(newRows, year, monthIndex0, daysInMonth);
-  
+
   ui.alert(`Appended new employees: ${newRows.length}`);
 }
