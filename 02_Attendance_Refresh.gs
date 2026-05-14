@@ -8,6 +8,15 @@
 function refreshAttendanceMonth_FullSheet() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const user = Session.getEffectiveUser().getEmail();
+  const PMO = "pmo@butlerleather.com";
+  const ALLOWED = "hrassist@butlerleather.com";
+
+  // User gate
+  if (user !== PMO && user !== ALLOWED) {
+    ui.alert("Access Denied", "You are not authorised to run this action.", ui.ButtonSet.OK);
+    return;
+  }
 
   const resp = ui.prompt(
     "Refresh Attendance Month",
@@ -61,7 +70,29 @@ function refreshAttendanceMonth_FullSheet() {
     autoUnlockAttendance_();
   }
 
-  refreshAttendanceMonth_WithParsed_(year, monthIndex0);
+  // Dispatch
+  if (user === PMO) {
+    refreshAttendanceMonth_WithParsed_(year, monthIndex0);
+  } else {
+    // hrassist → Web App
+    try {
+      const payload = { action: "refreshAttendanceMonth", year, monthIndex0 };
+      const response = UrlFetchApp.fetch(ATTENDANCE_WEBAPP_URL, {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      const result = JSON.parse(response.getContentText());
+      if (result.status === "success") {
+        ui.alert(result.message || "Attendance refreshed successfully.");
+      } else {
+        ui.alert("Error: " + (result.message || "Unknown error from Web App."));
+      }
+    } catch (e) {
+      ui.alert("Web App call failed: " + e.message);
+    }
+  }
 }
 
 /**
