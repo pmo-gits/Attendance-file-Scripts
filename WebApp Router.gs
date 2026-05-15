@@ -4,7 +4,7 @@
  *
  * Single doPost entry point for all Web App actions.
  * Owner (pmo@butlerleather.com) runs all functions directly.
- * hrassist@butlerleather.com routes through this Web App.
+ * tally@butlerleather.com routes through this Web App.
  * All other users are blocked at each individual script's user gate.
  *
  * ATTENDANCE_WEBAPP_URL is defined ONCE here.
@@ -12,9 +12,20 @@
  ************************************************/
 
 const ATTENDANCE_WEBAPP_URL =
-  "https://script.google.com/macros/s/AKfycbzNU0H8MFUy7ZM-qHSotwt3gByh_fEpDa8G1aBWx_xvWtO_xUdhKm6hcfBLu8uYnbf-/exec";
+  "https://script.google.com/macros/s/AKfycbzP2ob-QEwc6Jc5mIPATltoI7_vt_cROwEL4kV33nmqt6owXnnz_SDHGHLlQdgmvjf7/exec";
 
-const WEBAPP_ALLOWED_USER_ = "hrassist@butlerleather.com";
+const WEBAPP_ALLOWED_USER_ = "tally@butlerleather.com";
+
+/**
+ * forceEmailScope_
+ * Never called in production.
+ * Exists solely so Apps Script includes userinfo.email scope
+ * during authorization. Run this ONCE manually after deploying
+ * to trigger the authorization dialog.
+ */
+function forceEmailScope_() {
+  Session.getEffectiveUser().getEmail();
+}
 
 /* ================================================
  * doPost — Web App entry point
@@ -24,14 +35,14 @@ const WEBAPP_ALLOWED_USER_ = "hrassist@butlerleather.com";
  * ================================================ */
 function doPost(e) {
   try {
-    const user = Session.getEffectiveUser().getEmail();
+    const payload = JSON.parse(e.postData.contents);
+    const caller  = String(payload.caller || "").trim();
 
-    if (user !== WEBAPP_ALLOWED_USER_) {
+    if (caller !== WEBAPP_ALLOWED_USER_) {
       return jsonResponse_("error", "Access denied. You are not authorised to call this Web App.");
     }
 
-    const payload = JSON.parse(e.postData.contents);
-    const action  = String(payload.action || "").trim();
+    const action = String(payload.action || "").trim();
 
     switch (action) {
 
@@ -39,13 +50,13 @@ function doPost(e) {
         return refreshAttendanceMonthServer_(payload);
 
       case "syncNewEmployees":
-        return syncNewEmployeesServer_();
+        return syncNewEmployeesServer_(payload);
 
       case "getLeaveBalances":
-        return getLeaveBalancesServer_();
+        return getLeaveBalancesServer_(payload);
 
       case "recalcLateEntryPenalty":
-        return recalcLateEntryPenaltyServer_();
+        return recalcLateEntryPenaltyServer_(payload);
 
       default:
         return jsonResponse_("error", `Unknown action: "${action}"`);
@@ -64,18 +75,25 @@ function doPost(e) {
 
 /**
  * refreshAttendanceMonth
- * Requires: year (number), monthIndex0 (number) in payload.
+ * Requires: year, monthIndex0, spreadsheetId in payload.
+ * Sets active spreadsheet to the correct generated file before calling runner.
  * Calls: refreshAttendanceMonth_WithParsed_() in 02_Attendance_Refresh.gs
  */
 function refreshAttendanceMonthServer_(payload) {
   try {
     const year        = Number(payload.year);
     const monthIndex0 = Number(payload.monthIndex0);
+    const ssId        = String(payload.spreadsheetId || "").trim();
 
     if (isNaN(year) || isNaN(monthIndex0) || monthIndex0 < 0 || monthIndex0 > 11) {
       return jsonResponse_("error", "Invalid year or monthIndex0 in payload.");
     }
+    if (!ssId) {
+      return jsonResponse_("error", "Missing spreadsheetId in payload.");
+    }
 
+    const ss = SpreadsheetApp.openById(ssId);
+    SpreadsheetApp.setActiveSpreadsheet(ss);
     refreshAttendanceMonth_WithParsed_(year, monthIndex0);
 
     return jsonResponse_(
@@ -90,12 +108,19 @@ function refreshAttendanceMonthServer_(payload) {
 
 /**
  * syncNewEmployees
- * Detects everything internally (sheet, header date, emp master).
+ * Requires: spreadsheetId in payload.
+ * Sets active spreadsheet to the correct generated file before detecting state.
  * Calls: syncNewEmployeesAppendOnly_Runner_() in 03_Attendance_SyncNew.gs
  */
-function syncNewEmployeesServer_() {
+function syncNewEmployeesServer_(payload) {
   try {
-    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+    const ssId = String(payload.spreadsheetId || "").trim();
+    if (!ssId) {
+      return jsonResponse_("error", "Missing spreadsheetId in payload.");
+    }
+
+    const ss = SpreadsheetApp.openById(ssId);
+    SpreadsheetApp.setActiveSpreadsheet(ss);
     const sheet = ss.getSheetByName(ATTENDANCE_SHEET_NAME);
 
     if (!sheet) {
@@ -151,15 +176,22 @@ function syncNewEmployeesServer_() {
 
 /**
  * getLeaveBalances
- * Detects everything internally (attendance file name, lock state).
+ * Requires: spreadsheetId in payload.
+ * Sets active spreadsheet to the correct generated file before detecting state.
  * On success: locks Attendance + protects Leave Balances tab (pmo only).
  * Calls: computeLeaveBalancesRows_(), writeLeaveBalancesToAttendance_(),
  *        setAttendanceLocked_(), protectLeaveBalancesTab_()
  *        in 04_Leave_GetBalances.gs / 05_Lock.gs
  */
-function getLeaveBalancesServer_() {
+function getLeaveBalancesServer_(payload) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ssId = String(payload.spreadsheetId || "").trim();
+    if (!ssId) {
+      return jsonResponse_("error", "Missing spreadsheetId in payload.");
+    }
+
+    const ss = SpreadsheetApp.openById(ssId);
+    SpreadsheetApp.setActiveSpreadsheet(ss);
 
     if (isAttendanceLocked_()) {
       return jsonResponse_("error", "Attendance is LOCKED. No changes allowed.");
@@ -188,13 +220,20 @@ function getLeaveBalancesServer_() {
 
 /**
  * recalcLateEntryPenalty
- * Detects everything internally (Late Entry sheet, header mapping, emp range).
+ * Requires: spreadsheetId in payload.
+ * Sets active spreadsheet to the correct generated file before detecting state.
  * On success: locks LATE PENALTY COUNT column (pmo only) via runner.
  * Calls: recalcLateEntryPenalty_Runner_() in 11_LateEntry_PenaltyCalc.gs
  */
-function recalcLateEntryPenaltyServer_() {
+function recalcLateEntryPenaltyServer_(payload) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ssId = String(payload.spreadsheetId || "").trim();
+    if (!ssId) {
+      return jsonResponse_("error", "Missing spreadsheetId in payload.");
+    }
+
+    const ss = SpreadsheetApp.openById(ssId);
+    SpreadsheetApp.setActiveSpreadsheet(ss);
     const sh = ss.getSheetByName(LATE_ENTRY_SHEET_NAME);
 
     if (!sh) {
