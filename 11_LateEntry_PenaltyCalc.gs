@@ -10,7 +10,7 @@ function recalcLateEntryLeavePenaltyCount() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const user = Session.getEffectiveUser().getEmail();
   const PMO = "pmo@butlerleather.com";
-  const ALLOWED = "hrassist@butlerleather.com";
+  const ALLOWED = "tally@butlerleather.com";
 
   // User gate
   if (user !== PMO && user !== ALLOWED) {
@@ -18,7 +18,7 @@ function recalcLateEntryLeavePenaltyCount() {
     return;
   }
 
-  // ✅ Allow run only from Late Entry sheet
+  // Allow run only from Late Entry sheet
   const activeSheet = ss.getActiveSheet();
   if (!activeSheet || activeSheet.getName() !== "Late Entry") {
     ui.alert('Please run this function from the "Late Entry" sheet only.');
@@ -85,9 +85,9 @@ function recalcLateEntryLeavePenaltyCount() {
     recalcLateEntryPenalty_Runner_(sh, iPenalty, iEmpCode, iCategory, dateStartCol1, dateEndCol1, lastEmpIndex0, lastCol);
     ui.alert(`Late penalty calculated ✅\nEmployees processed: ${lastEmpIndex0 + 1}`);
   } else {
-    // hrassist → Web App
+    // tally -> Web App
     try {
-      const payload = { action: "recalcLateEntryPenalty" };
+      const payload = { action: "recalcLateEntryPenalty", caller: user, spreadsheetId: ss.getId() };
       const response = UrlFetchApp.fetch(ATTENDANCE_WEBAPP_URL, {
         method: "post",
         contentType: "application/json",
