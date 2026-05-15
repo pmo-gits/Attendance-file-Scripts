@@ -3,9 +3,10 @@
  ************************************************/
 function syncNewEmployeesAppendOnly() {
   const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const user = Session.getEffectiveUser().getEmail();
   const PMO = "pmo@butlerleather.com";
-  const ALLOWED = "hrassist@butlerleather.com";
+  const ALLOWED = "tally@butlerleather.com";
 
   // User gate
   if (user !== PMO && user !== ALLOWED) {
@@ -13,7 +14,7 @@ function syncNewEmployeesAppendOnly() {
     return;
   }
 
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ATTENDANCE_SHEET_NAME);
+  const sheet = ss.getSheetByName(ATTENDANCE_SHEET_NAME);
   if (!sheet) {
     ui.alert(`Sheet "${ATTENDANCE_SHEET_NAME}" not found. Please update ATTENDANCE_SHEET_NAME in script.`);
     return;
@@ -69,9 +70,9 @@ function syncNewEmployeesAppendOnly() {
   if (user === PMO) {
     syncNewEmployeesAppendOnly_Runner_(sheet, newRows, year, monthIndex0, daysInMonth);
   } else {
-    // hrassist → Web App
+    // tally -> Web App
     try {
-      const payload = { action: "syncNewEmployees" };
+      const payload = { action: "syncNewEmployees", caller: user, spreadsheetId: ss.getId() };
       const response = UrlFetchApp.fetch(ATTENDANCE_WEBAPP_URL, {
         method: "post",
         contentType: "application/json",
@@ -117,7 +118,7 @@ function syncNewEmployeesAppendOnly_Runner_(sheet, newRows, year, monthIndex0, d
   const totalEmpCount = sheet.getLastRow() - 1;
   applySundayWOFormattingAndProtection_(sheet, year, monthIndex0, daysInMonth, totalEmpCount);
 
-  // ✅ Append same employees into Late Entry
+  // Append same employees into Late Entry
   appendNewEmployeesToLateEntry_(newRows, year, monthIndex0, daysInMonth);
 
   ui.alert(`Appended new employees: ${newRows.length}`);
