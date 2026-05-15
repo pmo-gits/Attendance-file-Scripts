@@ -7,7 +7,7 @@ function getLeaveBalances_Button() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const user = Session.getEffectiveUser().getEmail();
   const PMO = "pmo@butlerleather.com";
-  const ALLOWED = "hrassist@butlerleather.com";
+  const ALLOWED = "tally@butlerleather.com";
 
   // User gate
   if (user !== PMO && user !== ALLOWED) {
@@ -49,9 +49,9 @@ function getLeaveBalances_Button() {
     protectLeaveBalancesTab_();
     ui.alert(`LOCKED ✅\nLeave balances updated successfully.\n\nRows: ${rows.length}`);
   } else {
-    // hrassist → Web App
+    // tally -> Web App
     try {
-      const payload = { action: "getLeaveBalances" };
+      const payload = { action: "getLeaveBalances", caller: user, spreadsheetId: ss.getId() };
       const response = UrlFetchApp.fetch(ATTENDANCE_WEBAPP_URL, {
         method: "post",
         contentType: "application/json",
