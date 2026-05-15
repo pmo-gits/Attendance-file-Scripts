@@ -10,7 +10,7 @@ function refreshAttendanceMonth_FullSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const user = Session.getEffectiveUser().getEmail();
   const PMO = "pmo@butlerleather.com";
-  const ALLOWED = "hrassist@butlerleather.com";
+  const ALLOWED = "tally@butlerleather.com";
 
   // User gate
   if (user !== PMO && user !== ALLOWED) {
@@ -73,10 +73,11 @@ function refreshAttendanceMonth_FullSheet() {
   // Dispatch
   if (user === PMO) {
     refreshAttendanceMonth_WithParsed_(year, monthIndex0);
+    ui.alert(`Attendance refreshed for ${monthName_(monthIndex0)} ${year}.`);
   } else {
-    // hrassist → Web App
+    // tally -> Web App
     try {
-      const payload = { action: "refreshAttendanceMonth", year, monthIndex0 };
+      const payload = { action: "refreshAttendanceMonth", year, monthIndex0, caller: user, spreadsheetId: ss.getId() };
       const response = UrlFetchApp.fetch(ATTENDANCE_WEBAPP_URL, {
         method: "post",
         contentType: "application/json",
@@ -97,14 +98,14 @@ function refreshAttendanceMonth_FullSheet() {
 
 /**
  * Refresh Attendance Month (Internal Runner)
+ * UI-free: called by both pmo direct path and Web App server handler.
+ * Errors thrown — caller handles messaging.
  */
 function refreshAttendanceMonth_WithParsed_(year, monthIndex0) {
-  const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(ATTENDANCE_SHEET_NAME);
   if (!sheet) {
-    ui.alert(`Sheet "${ATTENDANCE_SHEET_NAME}" not found. Please update ATTENDANCE_SHEET_NAME in script.`);
-    return;
+    throw new Error(`Sheet "${ATTENDANCE_SHEET_NAME}" not found.`);
   }
 
   const daysInMonth = new Date(year, monthIndex0 + 1, 0).getDate();
@@ -112,8 +113,7 @@ function refreshAttendanceMonth_WithParsed_(year, monthIndex0) {
   // Fetch ACTIVE employees
   const empRows = fetchActiveEmployees_();
   if (empRows.length === 0) {
-    ui.alert("No ACTIVE employees found in Employee Master.");
-    return;
+    throw new Error("No ACTIVE employees found in Employee Master.");
   }
 
   // Centralized clearing (Attendance entry + Leave Balances + Late Entry + OT Entry inputs)
@@ -137,8 +137,6 @@ function refreshAttendanceMonth_WithParsed_(year, monthIndex0) {
   // Late Entry refresh (same behavior as Attendance)
   refreshLateEntrySheet_(year, monthIndex0, empRows);
 
-  // ✅ Carry Forwarded refresh (NEW behavior: clear specific headers only; no empRows)
+  // Carry Forwarded refresh (clear specific headers only; no empRows)
   refreshCarryForwardedSheet_();
-
-  ui.alert(`Attendance refreshed for ${monthName_(monthIndex0)} ${year}.\nActive employees loaded: ${empRows.length}`);
 }
