@@ -6,7 +6,7 @@ function syncNewEmployeesAppendOnly() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const user = Session.getEffectiveUser().getEmail();
   const PMO = "pmo@butlerleather.com";
-  const ALLOWED = "tally@butlerleather.com";
+  const ALLOWED = "hrassist@butlerleather.com";
 
   // User gate
   if (user !== PMO && user !== ALLOWED) {
@@ -93,11 +93,22 @@ function syncNewEmployeesAppendOnly() {
 
 /**
  * Sync New Employees (Internal Runner)
+ * UI-free: called by both pmo direct path and Web App server handler.
+ * Errors thrown — caller handles messaging.
  */
 function syncNewEmployeesAppendOnly_Runner_(sheet, newRows, year, monthIndex0, daysInMonth) {
-  const ui = SpreadsheetApp.getUi();
-  const lastRow = sheet.getLastRow();
-  const appendStartRow = lastRow + 1;
+  // Find last actual employee row by scanning column B (not getLastRow)
+  // — avoids appending below validation-only rows
+  const maxRows = sheet.getMaxRows();
+  const colBValues = sheet.getRange(2, 2, maxRows - 1, 1).getValues();
+  let lastEmpRow = 1;
+  for (let i = colBValues.length - 1; i >= 0; i--) {
+    if (String(colBValues[i][0] || "").trim() !== "") {
+      lastEmpRow = i + 2; // +1 for 0-index, +1 for header row
+      break;
+    }
+  }
+  const appendStartRow = lastEmpRow + 1;
 
   // Ensure enough rows
   const needed = appendStartRow + newRows.length - 1;
@@ -115,11 +126,10 @@ function syncNewEmployeesAppendOnly_Runner_(sheet, newRows, year, monthIndex0, d
   fillWOSundaysForRows_(sheet, year, monthIndex0, daysInMonth, appendStartRow, newRows.length);
 
   // Rebuild protections to include new rows
-  const totalEmpCount = sheet.getLastRow() - 1;
+  // Use lastEmpRow + newRows.length to get accurate total — avoids getLastRow() counting validation rows
+  const totalEmpCount = lastEmpRow + newRows.length - 1;
   applySundayWOFormattingAndProtection_(sheet, year, monthIndex0, daysInMonth, totalEmpCount);
 
   // Append same employees into Late Entry
   appendNewEmployeesToLateEntry_(newRows, year, monthIndex0, daysInMonth);
-
-  ui.alert(`Appended new employees: ${newRows.length}`);
 }
