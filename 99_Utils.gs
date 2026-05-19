@@ -188,6 +188,8 @@ function getSheetTitleByIdCached_(spreadsheetId, sheetId) {
  *   rows 2..maxRows (keeps formula-driven columns intact)
  * - Other Deductions inputs by HEADER NAME (Employee Code, Deduction Type, Amount, Month Applicable [MM/DD/YY], Remarks)
  *   rows 2..maxRows (keeps formula-driven columns intact)
+ * - Salary Advance deductions inputs by HEADER NAME (rows 2..maxRows)
+ *   includes SA Run Timestamp (row 2 cleared on refresh)
  ************************************************/
 function clearMonthlySheets_(attendanceSheet, empCount, year, monthIndex0, daysInMonth) {
   const ATTENDANCE_MARKS_CLEAR_LAST_ROW = 1000;
@@ -421,6 +423,7 @@ function clearOtherDeductionsInputsByHeader_(sh, startRow, endRow) {
  * - HR DECISION
  * - PAYROLL STATUS
  * - RECOVERED AMOUNT
+ * - SA RUN TIMESTAMP (row 2 cleared on month refresh — header in row 1 preserved)
  *
  * Keeps any non-target columns intact.
  */
@@ -441,7 +444,8 @@ function clearSalaryAdvanceDeductionsInputsByHeader_(sh, startRow, endRow) {
     'CURRENT BALANCE',
     'HR DECISION',
     'PAYROLL STATUS',
-    'RECOVERED AMOUNT'
+    'RECOVERED AMOUNT',
+    'SA RUN TIMESTAMP', // ✅ clears row 2 on month refresh; header in row 1 preserved
   ];
 
   const numRows = Math.max(endRow - startRow + 1, 0);
