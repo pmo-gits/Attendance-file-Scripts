@@ -10,7 +10,7 @@ function refreshAttendanceMonth_FullSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const user = Session.getEffectiveUser().getEmail();
   const PMO = "pmo@butlerleather.com";
-  const ALLOWED = "tally@butlerleather.com";
+  const ALLOWED = "hrassist@butlerleather.com";
 
   // User gate
   if (user !== PMO && user !== ALLOWED) {
